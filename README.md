@@ -1,8 +1,8 @@
 # crm-documents-downloader
 
 **input_dir**: Es la dirección donde deben estar los archivos de excel descargados del crm con el formato: 
-  \n campus_code
-    \n Ficha matrícula digital simple.xlsx
+  /n campus_code
+    /n Ficha matrícula digital simple.xlsx
 Al decargarlo de crm siempre viene con ese nombre así que basta con crear una carpeta para cada campus_code y guardar adentro la ficha descargada.
 
 **output_dir**: Es la dirección donde se van a guardar los archivos descargados de s3. Se guarda un archivo por stage, nivel, jornada y nombre de cada niño.
