@@ -10,7 +10,7 @@ BEARER_TOKEN = os.getenv("BEARER_TOKEN")
 API_URL = "https://api.tether.education/contracts"
 
 # Función para realizar la solicitud y descargar el contrato
-def download_contract(template_id, external_id, user_id, campus_code, applicant_id, applicant_name, stage, nivel, jornada, output_path):
+def download_contract(template_id, external_id, user_id, campus_code, carpeta, applicant_id, applicant_name, stage, nivel, jornada, output_path, alertas):
     query = """
     query DownloadContractByCampus {
         downloadContractByCampus(
@@ -64,7 +64,7 @@ def download_contract(template_id, external_id, user_id, campus_code, applicant_
             file_content = base64.b64decode(contract_data)
 
             # Crear directorio de salida si no existe
-            local_applicant_folder = os.path.join(output_path, campus_code, stage, nivel, jornada, f"{applicant_name}_{applicant_id}")
+            local_applicant_folder = os.path.join(output_path, carpeta, "Matrícula 2025", stage, nivel, jornada, f"{applicant_name}_{applicant_id}")
             os.makedirs(local_applicant_folder, exist_ok=True)
 
             # Guardar archivo en el sistema local
@@ -74,7 +74,17 @@ def download_contract(template_id, external_id, user_id, campus_code, applicant_
 
             print(f"Contrato descargado: {local_file_path}")
         else:
-            print(f"No se encontró contrato para templateId={template_id} y externalId={external_id}")
+            mensaje = f"No se encontró contrato para templateId={template_id} y externalId={external_id}"
+            print(mensaje)
+            alertas.append(mensaje)
 
+    except requests.exceptions.RequestException as e:
+        # Capturar errores generales de solicitud
+        mensaje_error = f"Error al descargar contrato para templateId={template_id} y externalId={external_id}: {e}"
+        print(mensaje_error)
+        alertas.append(mensaje_error)
     except Exception as e:
-        print(f"Error al descargar contrato para templateId={template_id} y externalId={external_id}: {e}")
+        # Capturar otros errores (como IncompleteRead)
+        mensaje_error = f"Error inesperado al procesar contrato para templateId={template_id} y externalId={external_id}: {e}"
+        print(mensaje_error)
+        alertas.append(mensaje_error)

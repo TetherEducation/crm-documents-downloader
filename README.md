@@ -1,15 +1,8 @@
 # crm-documents-downloader
 
-**input_dir**: Es la dirección donde deben estar los archivos de excel descargados del crm con el formato: 
-   
-   campus_code   
-    > Ficha matrícula digital simple.xlsx
-
-Al decargarlo de crm siempre viene con ese nombre así que basta con crear una carpeta para cada campus_code y guardar adentro la ficha descargada.
-
 **output_dir**: Es la dirección donde se van a guardar los archivos descargados de s3. Se guarda un archivo por stage, nivel, jornada y nombre de cada niño.
 
-**carpetas**: En carpetas se debe poner el listado de campus_code que se quiere procesar. Ejemplo: carpetas = ["931800001", "1471700001"]
+**carpetas**: En carpetas se debe poner el listado de los nombres de carpetas que se van a procesar. 
 
 **template_types**: Son todos los tipos de templates que guardan algún archivo en s3. Si se agregan nuevos hay que hacer update de esto.
 

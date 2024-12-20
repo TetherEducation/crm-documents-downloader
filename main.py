@@ -1,118 +1,132 @@
-from data_processing import load_and_process_excel, map_stage, check_stage_empty
-from mongo_operations import fetch_admissions_data, fetch_surveys_data, fetch_contracts_data
+from data_processing import process_student_data, map_stage, check_stage_empty
+from mongo_operations import fetch_surveys_data, fetch_contracts_data
 from s3_operations import get_s3_client, download_from_answers
 from contracts_operations import download_contract
+from download_admission_form import download_admission_form
 from dictionary import carpetas, template_types, key_mapping
 import os 
+import re
 from pymongo import MongoClient
 import pandas as pd
-from bson import ObjectId
 from dotenv import load_dotenv
 load_dotenv()
 
-input_dir = "/Users/leidygomez/Downloads/inputs_matricula_digital/"
-output_dir = "/Users/leidygomez/Downloads/documentos_matricula_digital/"
+
+output_dir = "/Users/leidygomez/Library/CloudStorage/GoogleDrive-leidy@tether.education/Shared drives/Matrícula Digital/Chile/"
+output_dir_alertas = "/Users/leidygomez/Downloads"
 MONGO_URI = os.getenv("MONGO_URI")
 bucket = "crm-surveys-files"
 
-
+relacion_rbd_campus_path = os.path.join(os.path.dirname(__file__), "data/relacion_rbd_campus.csv")
+relacion_rbd_campus = pd.read_csv(relacion_rbd_campus_path)
 
     
 alertas = []
+alertas_contratos = [] 
 
 for carpeta in carpetas:
-    df = load_and_process_excel(f"{input_dir}/{carpeta}/Ficha matrícula digital simple.xlsx")
-    df = map_stage(df)
-    alerta_stage = check_stage_empty(df, carpeta)
-    if alerta_stage:
-        alertas.append(alerta_stage)
+    # Extraer institution_code
+    institution_code = re.match(r'^\d+', carpeta).group()
+    print(f"Institution code: {institution_code}")
 
-    #try:
-    # Conectando a admissions
-    client = MongoClient(MONGO_URI)
-    admission_id_strings = df['admission_id'].tolist()
-    admission_ids = [ObjectId(id_str) for id_str in admission_id_strings]
-    admissions = fetch_admissions_data(client, "crm", "admissions", admission_ids)
-    admissions = pd.DataFrame(admissions).rename(columns={'_id': 'admission_id'}).astype(str)
+    # Obtener los campus_code asociados
+    campus_codes = relacion_rbd_campus[relacion_rbd_campus['institution_code'] == institution_code]['campus_code'].tolist()
+    print(f"Campus codes asociados: {campus_codes}")
 
-    if admissions.empty:
-        alerta_admissions = f"Alerta: La base de admissions está vacía para la carpeta {carpeta}"
-        print(alerta_admissions)
-        alertas.append(alerta_admissions)
-        continue  # Saltar a la siguiente carpeta
+    # Iterar sobre los campus_code
+    for campus_code in campus_codes:
+        print(f"Procesando campus_code: {campus_code}")
 
-    # Conectando a surveys
-    applicationIds = admissions['applicationId'].tolist()
-    surveys = fetch_surveys_data(client, "tools", "surveys", applicationIds, template_types)
-    surveys = pd.DataFrame(surveys).rename(columns={'_id': 'survey_id', 'externalId': 'applicationId'})
+        df = download_admission_form(campus_code)
+        df = process_student_data(df)
+        df = map_stage(df)
 
-    if surveys.empty:
-        alerta_surveys = f"Alerta: La base de surveys está vacía para la carpeta {carpeta}"
-        print(alerta_surveys)
-        alertas.append(alerta_surveys)
-    else:
-        # Uniendo dataframes y descargando archivos de S3
-        surveys = pd.merge(surveys, admissions, on='applicationId', how='left')
-        surveys = pd.merge(surveys, df, on='admission_id', how='left')
+        #Verificar si hay stage vacío
+        alerta_stage = check_stage_empty(df, campus_code)
+        if alerta_stage:
+            alertas.append(alerta_stage)
 
-        # Descargando los archivos desde S3
-        s3_client = get_s3_client()
-        for _, row in surveys.iterrows():
-            download_from_answers(
-                row["answers"], 
-                row["rut"], 
-                row["nombre_estudiante"], 
-                carpeta, 
-                row["stage"], 
-                row["Nivel"], 
-                row["Jornada"], 
-                output_dir, 
-                key_mapping, 
-                bucket, 
-                s3_client
-            )
-        print(f"Descarga de s3 completada para campus_code {carpeta}.")
+        try:
+            # Conectando a surveys
+            client = MongoClient(MONGO_URI)
+            applicationIds = df['applicationId'].tolist()
+            surveys = fetch_surveys_data(client, "tools", "surveys", applicationIds, template_types)
+            surveys = pd.DataFrame(surveys).rename(columns={'_id': 'survey_id', 'externalId': 'applicationId'})
 
-    # Conectando a contracts
-    contracts = fetch_contracts_data(client, "tools", "contracts", carpeta, applicationIds)
-    contracts = pd.DataFrame(contracts).rename(columns={'externalId': 'applicationId'})
+            if surveys.empty:
+                alerta_surveys = f"Alerta: La base de surveys está vacía para campus_code {campus_code}"
+                print(alerta_surveys)
+                alertas.append(alerta_surveys)
+            else:
+                # Uniendo dataframes y descargando archivos de S3
+                surveys = pd.merge(surveys, df, on='applicationId', how='left')
+                print(surveys.shape[0])
+                surveys = surveys.head(5)
 
-    if contracts.empty:
-        alerta_contracts = f"Alerta: La base de contracts está vacía para la carpeta {carpeta}"
-        print(alerta_contracts)
-        alertas.append(alerta_contracts)
-    else:
-        # Uniendo dataframes y descargando archivos de S3
-        contracts = pd.merge(contracts, admissions, on='applicationId', how='left')
-        contracts = pd.merge(contracts, df, on='admission_id', how='left')
+                #Descargando los archivos desde S3
+                s3_client = get_s3_client()
+                for _, row in surveys.iterrows():
+                    download_from_answers(
+                        row["answers"], 
+                        row["rut"], 
+                        row["nombre_estudiante"], 
+                        carpeta,  # Usar carpeta completa como nombre
+                        row["stage"], 
+                        row["Nivel"], 
+                        row["Jornada"], 
+                        output_dir, 
+                        key_mapping, 
+                        bucket, 
+                        s3_client
+                    )
+                print(f"Descarga de S3 completada para campus_code {campus_code}.")
 
-        # Descargando los contratos de pandadoc
-        for _, row in contracts.iterrows():
-            download_contract(
-                            row["providerTemplateId"], 
-                            row["applicationId"], 
-                            row["userId"], 
-                            row["campusId"], 
-                            row["rut"], 
-                            row["nombre_estudiante"], 
-                            row["stage"], 
-                            row["Nivel"], 
-                            row["Jornada"],
-                            output_dir 
-                        )
-        print(f"Descarga de contratos completada para campus_code {carpeta}.")
+            # Conectando a contracts
+            contracts = fetch_contracts_data(client, "tools", "contracts", campus_code, applicationIds)
+            contracts = pd.DataFrame(contracts).rename(columns={'externalId': 'applicationId'})
 
-    print(f"Procesamiento de contratos completado para campus_code {carpeta}.")
+            if contracts.empty:
+                alerta_contracts = f"Alerta: La base de contracts está vacía para campus_code {campus_code}"
+                print(alerta_contracts)
+                alertas.append(alerta_contracts)
+            else:
+                # Uniendo dataframes y descargando contratos de pandadoc
+                contracts = pd.merge(contracts, df, on='applicationId', how='left')
+                contracts = contracts.head(5)
+                print(contracts.shape[0])
 
-    # Guardar alertas en un archivo de texto
-    if alertas:
-        with open(output_dir + "alertas.txt", "w") as archivo:
-            archivo.write("\n\n".join(alertas))
-        print("Se han guardado las alertas en el archivo 'alertas.txt'.")
+                for _, row in contracts.iterrows():
+                    download_contract(
+                        row["providerTemplateId"], 
+                        row["applicationId"], 
+                        row["userId"], 
+                        row["campusId"], 
+                        carpeta,
+                        row["rut"], 
+                        row["nombre_estudiante"], 
+                        row["stage"], 
+                        row["Nivel"], 
+                        row["Jornada"],
+                        output_dir,
+                        alertas_contratos
+                    )
+                print(f"Descarga de contratos completada para campus_code {campus_code}.")
+                # Guardar alertas en un archivo si es necesario
+                if alertas_contratos:
+                    with open(output_dir_alertas + "alertas_contratos.txt", "w") as archivo:
+                        archivo.write("\n\n".join(alertas_contratos))
+                    print("Se han guardado las alertas en el archivo 'alertas_contratos.txt'.")
 
-    # except Exception as e:
-    #     alerta_error = f"Error al procesar la carpeta {carpeta}: {e}"
-    #     print(alerta_error)
-    #     alertas.append(alerta_error)
+        except Exception as e:
+            alerta_error = f"Error al procesar la carpeta {carpeta} y campus_code {campus_code}: {e}"
+            print(alerta_error)
+            alertas.append(alerta_error)
+
+# Guardar alertas en un archivo de texto
+if alertas:
+    with open(output_dir_alertas + "alertas.txt", "w") as archivo:
+        archivo.write("\n\n".join(alertas))
+    print("Se han guardado las alertas en el archivo 'alertas.txt'.")
+
 
 

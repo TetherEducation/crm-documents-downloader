@@ -8,7 +8,7 @@ def get_s3_client():
         aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
     )
 
-def download_from_answers(answers, applicant_id, applicant_name, campus_code, stage, nivel, jornada, output_path, key_mapping, bucket, s3_client):
+def download_from_answers(answers, applicant_id, applicant_name, carpeta, stage, nivel, jornada, output_path, key_mapping, bucket, s3_client):
     for key, url_list in answers.items():
         for url in url_list:
             if not url:
@@ -18,7 +18,7 @@ def download_from_answers(answers, applicant_id, applicant_name, campus_code, st
                 file_extension = os.path.splitext(url.split("/")[-1])[1]
                 renamed_key = key_mapping.get(key, key)
                 new_file_name = f"{renamed_key}_{applicant_name}_{applicant_id}{file_extension}"
-                local_path = os.path.join(output_path, campus_code, stage, nivel, jornada, f"{applicant_name}_{applicant_id}")
+                local_path = os.path.join(output_path, carpeta, "Matrícula 2025", stage, nivel, jornada, f"{applicant_name}_{applicant_id}")
                 os.makedirs(local_path, exist_ok=True)
 
                 print(f"Descargando {key} -> {local_path}")

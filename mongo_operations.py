@@ -26,7 +26,7 @@ def fetch_surveys_data(client, database, collection_name, application_ids, templ
     return surveys_data
 
 
-def fetch_contracts_data(client, database, collection_name, carpeta, application_ids, batch_size=1000):
+def fetch_contracts_data(client, database, collection_name, campus_code, application_ids, batch_size=1000):
     db = client[database]
     collection = db[collection_name]
     contracts_data = []
@@ -34,7 +34,7 @@ def fetch_contracts_data(client, database, collection_name, carpeta, application
         batch = application_ids[i:i + batch_size]
         cursor = collection.find({
         "externalId": {"$in": batch},
-        "campusId": carpeta,
+        "campusId": campus_code,
         "status": "SIGNED"},
         {"externalId": 1, "providerTemplateId": 1, "userId": 1, "campusId": 1})
         contracts_data.extend(list(cursor))
