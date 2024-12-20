@@ -6,6 +6,7 @@ from download_admission_form import download_admission_form
 from dictionary import carpetas, template_types, key_mapping
 import os 
 import re
+import datetime
 from pymongo import MongoClient
 import pandas as pd
 from dotenv import load_dotenv
@@ -13,7 +14,9 @@ load_dotenv()
 
 
 output_dir = "/Users/leidygomez/Library/CloudStorage/GoogleDrive-leidy@tether.education/Shared drives/Matrícula Digital/Chile/"
-output_dir_alertas = "/Users/leidygomez/Downloads/"
+output_dir_local = "/Users/leidygomez/Downloads/"
+notas_file_path = os.path.join(output_dir_local, "notas_procesamiento.txt")
+
 MONGO_URI = os.getenv("MONGO_URI")
 bucket = "crm-surveys-files"
 
@@ -80,8 +83,8 @@ for carpeta in carpetas:
                         s3_client
                     )
                 print(f"Descarga de S3 completada para campus_code {campus_code}.")
-                os.makedirs(output_dir_alertas + f"{campus_code}/", exist_ok=True)
-                surveys.to_csv(output_dir_alertas + f"{campus_code}/surveys.csv")
+                os.makedirs(output_dir_local + f"{campus_code}/", exist_ok=True)
+                surveys.to_csv(output_dir_local + f"{campus_code}/surveys.csv")
 
             # Conectando a contracts
             contracts = fetch_contracts_data(client, "tools", "contracts", campus_code, applicationIds)
@@ -110,28 +113,25 @@ for carpeta in carpetas:
                         row["Nivel"], 
                         row["Jornada"],
                         output_dir,
-                        alertas_contratos
+                        alertas
                     )
                 print(f"Descarga de contratos completada para campus_code {campus_code}.")
-                os.makedirs(output_dir_alertas + f"{campus_code}/", exist_ok=True)
-                contracts.to_csv(output_dir_alertas + f"{campus_code}/contracts.csv")
-                
-                # Guardar alertas en un archivo si es necesario
-                if alertas_contratos:
-                    with open(output_dir_alertas + "alertas_contratos.txt", "w") as archivo:
-                        archivo.write("\n\n".join(alertas_contratos))
-                    print("Se han guardado las alertas en el archivo 'alertas_contratos.txt'.")
+                os.makedirs(output_dir_local + f"{campus_code}/", exist_ok=True)
+                contracts.to_csv(output_dir_local + f"{campus_code}/contracts.csv")
+
+            #Registrar notas para el campus actual
+            with open(notas_file_path, "a") as notas_file:
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                notas_file.write(f"\n\nProcesamiento completado para campus_code {campus_code} ({timestamp})\n")
+                notas_file.write("Alertas encontradas:\n")
+                notas_file.write("\n".join(alertas if alertas else ["Sin alertas."]))
+                notas_file.write("\n")
 
         except Exception as e:
             alerta_error = f"Error al procesar la carpeta {carpeta} y campus_code {campus_code}: {e}"
             print(alerta_error)
             alertas.append(alerta_error)
-
-# Guardar alertas en un archivo de texto
-if alertas:
-    with open(output_dir_alertas + "alertas.txt", "w") as archivo:
-        archivo.write("\n\n".join(alertas))
-    print("Se han guardado las alertas en el archivo 'alertas.txt'.")
-
-
+            with open(notas_file_path, "a") as notas_file:
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                notas_file.write(f"\n\nError procesando campus_code {campus_code} ({timestamp}): {alerta_error}\n")
 
