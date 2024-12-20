@@ -13,7 +13,7 @@ load_dotenv()
 
 
 output_dir = "/Users/leidygomez/Library/CloudStorage/GoogleDrive-leidy@tether.education/Shared drives/Matrícula Digital/Chile/"
-output_dir_alertas = "/Users/leidygomez/Downloads"
+output_dir_alertas = "/Users/leidygomez/Downloads/"
 MONGO_URI = os.getenv("MONGO_URI")
 bucket = "crm-surveys-files"
 
@@ -37,16 +37,16 @@ for carpeta in carpetas:
     for campus_code in campus_codes:
         print(f"Procesando campus_code: {campus_code}")
 
-        df = download_admission_form(campus_code)
-        df = process_student_data(df)
-        df = map_stage(df)
-
-        #Verificar si hay stage vacío
-        alerta_stage = check_stage_empty(df, campus_code)
-        if alerta_stage:
-            alertas.append(alerta_stage)
-
         try:
+            df = download_admission_form(campus_code)
+            df = process_student_data(df)
+            df = map_stage(df)
+
+            #Verificar si hay stage vacío
+            alerta_stage = check_stage_empty(df, campus_code)
+            if alerta_stage:
+                alertas.append(alerta_stage)
+        
             # Conectando a surveys
             client = MongoClient(MONGO_URI)
             applicationIds = df['applicationId'].tolist()
@@ -60,10 +60,12 @@ for carpeta in carpetas:
             else:
                 # Uniendo dataframes y descargando archivos de S3
                 surveys = pd.merge(surveys, df, on='applicationId', how='left')
+                surveys = surveys.sort_values(by=['stage', 'Nivel', 'Jornada', 'applicationId', 'templateType'], ascending=[True, True, True, True, True]).reset_index(drop=True)
 
                 #Descargando los archivos desde S3
                 s3_client = get_s3_client()
-                for _, row in surveys.iterrows():
+                for index, row in surveys.iterrows():
+                    print(f"{index}/{len(surveys)}")
                     download_from_answers(
                         row["answers"], 
                         row["rut"], 
@@ -78,6 +80,8 @@ for carpeta in carpetas:
                         s3_client
                     )
                 print(f"Descarga de S3 completada para campus_code {campus_code}.")
+                os.makedirs(output_dir_alertas + f"{campus_code}/", exist_ok=True)
+                surveys.to_csv(output_dir_alertas + f"{campus_code}/surveys.csv")
 
             # Conectando a contracts
             contracts = fetch_contracts_data(client, "tools", "contracts", campus_code, applicationIds)
@@ -90,8 +94,10 @@ for carpeta in carpetas:
             else:
                 # Uniendo dataframes y descargando contratos de pandadoc
                 contracts = pd.merge(contracts, df, on='applicationId', how='left')
+                contracts = contracts.sort_values(by=['stage', 'Nivel', 'Jornada', 'applicationId', 'providerTemplateId'], ascending=[True, True, True, True, True]).reset_index(drop=True)
 
-                for _, row in contracts.iterrows():
+                for index, row in contracts.iterrows():
+                    print(f"{index}/{len(contracts)}")
                     download_contract(
                         row["providerTemplateId"], 
                         row["applicationId"], 
@@ -107,6 +113,9 @@ for carpeta in carpetas:
                         alertas_contratos
                     )
                 print(f"Descarga de contratos completada para campus_code {campus_code}.")
+                os.makedirs(output_dir_alertas + f"{campus_code}/", exist_ok=True)
+                contracts.to_csv(output_dir_alertas + f"{campus_code}/contracts.csv")
+                
                 # Guardar alertas en un archivo si es necesario
                 if alertas_contratos:
                     with open(output_dir_alertas + "alertas_contratos.txt", "w") as archivo:

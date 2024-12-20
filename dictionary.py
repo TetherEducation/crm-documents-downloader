@@ -1,16 +1,8 @@
-
 carpetas = [
-'20364 - Ayelen'
-]
+'26068 - Licarito']
+
 
 # carpetas = [
-# '20364 - Ayelen',
-# '25395 - Betterland',
-# '2014 - Pablo Neruda',
-# '25303 - Laura Vicuña',
-# '26436 - Terraustral Del Sol',
-# '26538 - Terraustral Oeste',
-# '24406 - Kind School',
 # '26068 - Licarito',
 # '9945  - Ellen College',
 # '10182 - Ellen College',
@@ -30,7 +22,6 @@ carpetas = [
 # '9036 - Jose Arrieta',
 # '25071 - Abelarda Nuñez',
 # '6085 - LBE Villarica',
-# '14717 - Las Americas',
 # '2102 - LB Rancagua',
 # '9688 - Liceo Gomez Millas',
 # '10542 - Baldomero Lillo',
