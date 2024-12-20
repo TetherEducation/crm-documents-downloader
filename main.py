@@ -60,8 +60,6 @@ for carpeta in carpetas:
             else:
                 # Uniendo dataframes y descargando archivos de S3
                 surveys = pd.merge(surveys, df, on='applicationId', how='left')
-                print(surveys.shape[0])
-                surveys = surveys.head(5)
 
                 #Descargando los archivos desde S3
                 s3_client = get_s3_client()
@@ -92,8 +90,6 @@ for carpeta in carpetas:
             else:
                 # Uniendo dataframes y descargando contratos de pandadoc
                 contracts = pd.merge(contracts, df, on='applicationId', how='left')
-                contracts = contracts.head(5)
-                print(contracts.shape[0])
 
                 for _, row in contracts.iterrows():
                     download_contract(
