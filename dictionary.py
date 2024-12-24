@@ -1,9 +1,5 @@
 
 carpetas = [
-'24406 - Kind School',
-'26068 - Licarito',
-'9945  - Ellen College',
-'10182 - Ellen College',
 '25279 - Salvador',
 '9318 - Mauricio Rugendas',
 '9907 - Camilo',

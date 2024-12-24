@@ -14,7 +14,7 @@ load_dotenv()
 
 
 output_dir = "/Users/leidygomez/Library/CloudStorage/GoogleDrive-leidy@tether.education/Shared drives/Matrícula Digital/Chile/"
-output_dir_local = "/Users/leidygomez/Downloads/"
+output_dir_local = "/Users/leidygomez/Downloads/campuses_md/"
 notas_file_path = os.path.join(output_dir_local, "notas_procesamiento.txt")
 
 MONGO_URI = os.getenv("MONGO_URI")
@@ -64,6 +64,23 @@ for carpeta in carpetas:
                 # Uniendo dataframes y descargando archivos de S3
                 surveys = pd.merge(surveys, df, on='applicationId', how='left')
                 surveys = surveys.sort_values(by=['stage', 'Nivel', 'Jornada', 'applicationId', 'templateType'], ascending=[True, True, True, True, True]).reset_index(drop=True)
+                surveys_completo = surveys
+
+                # Ruta del archivo surveys_anterior (version ya cargada de surveys)
+                surveys_anterior_path = output_dir_local + f"{campus_code}/surveys.csv"
+                if os.path.exists(surveys_anterior_path):
+                    try:
+                        surveys_anterior = pd.read_csv(surveys_anterior_path, usecols=['applicationId', 'templateType', 'answers']).rename(columns={'answers': 'answers_anterior'})
+                        surveys_completo = pd.merge(surveys, surveys_anterior, on=['applicationId', 'templateType'], how='left', indicator=True)
+                        surveys_completo[['answers_str', 'answers_anterior_str']] = surveys_completo[['answers', 'answers_anterior']].astype(str)
+
+                        # Filtrar solo los que se van a actualizar porque no estaban antes o porque cambiaron
+                        surveys = surveys_completo[(surveys_completo['_merge'] == 'left_only') | (surveys_completo['answers_str'] != surveys_completo['answers_anterior_str'])].reset_index(drop=True)
+
+                    except Exception as e:
+                        print(f"Error al procesar surveys_anterior: {e}")
+                else:
+                    print(f"Archivo surveys_anterior no encontrado: {surveys_anterior_path}")
 
                 #Descargando los archivos desde S3
                 s3_client = get_s3_client()
@@ -84,7 +101,7 @@ for carpeta in carpetas:
                     )
                 print(f"Descarga de S3 completada para campus_code {campus_code}.")
                 os.makedirs(output_dir_local + f"{campus_code}/", exist_ok=True)
-                surveys.to_csv(output_dir_local + f"{campus_code}/surveys.csv")
+                surveys_completo.to_csv(output_dir_local + f"{campus_code}/surveys.csv", columns=['applicationId', 'templateType', 'answers'])
 
             # Conectando a contracts
             contracts = fetch_contracts_data(client, "tools", "contracts", campus_code, applicationIds)
@@ -98,6 +115,22 @@ for carpeta in carpetas:
                 # Uniendo dataframes y descargando contratos de pandadoc
                 contracts = pd.merge(contracts, df, on='applicationId', how='left')
                 contracts = contracts.sort_values(by=['stage', 'Nivel', 'Jornada', 'applicationId', 'providerTemplateId'], ascending=[True, True, True, True, True]).reset_index(drop=True)
+                contracts_completo = contracts
+
+                # Ruta del archivo surveys_anterior (version ya cargada de surveys)
+                contracts_anterior_path = output_dir_local + f"{campus_code}/contracts.csv"
+                if os.path.exists(contracts_anterior_path):
+                    try:
+                        contracts_anterior = pd.read_csv(contracts_anterior_path, usecols=['applicationId', 'providerTemplateId'])
+                        contracts_completo = pd.merge(contracts, contracts_anterior, on=['applicationId', 'providerTemplateId'], how='left', indicator=True)
+
+                        # Filtrar solo los que se van a actualizar porque no estaban antes o porque cambiaron
+                        contracts = contracts_completo[(contracts_completo['_merge'] == 'left_only')].reset_index(drop=True)
+
+                    except Exception as e:
+                        print(f"Error al procesar contracts_anterior: {e}")
+                else:
+                    print(f"Archivo contracts_anterior no encontrado: {contracts_anterior_path}")
 
                 for index, row in contracts.iterrows():
                     print(f"{index}/{len(contracts)}")
@@ -117,7 +150,7 @@ for carpeta in carpetas:
                     )
                 print(f"Descarga de contratos completada para campus_code {campus_code}.")
                 os.makedirs(output_dir_local + f"{campus_code}/", exist_ok=True)
-                contracts.to_csv(output_dir_local + f"{campus_code}/contracts.csv")
+                contracts_completo.to_csv(output_dir_local + f"{campus_code}/contracts.csv")
 
             #Registrar notas para el campus actual
             with open(notas_file_path, "a") as notas_file:
