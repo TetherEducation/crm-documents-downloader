@@ -1,8 +1,9 @@
 from data_processing import process_student_data, map_stage, check_stage_empty
-from mongo_operations import fetch_surveys_data, fetch_contracts_data
+from mongo_operations import fetch_admissions_data, fetch_surveys_data, fetch_contracts_data
 from s3_operations import get_s3_client, download_from_answers
 from contracts_operations import download_contract
 from download_admission_form import download_admission_form
+from download_individual_report import download_individual_report
 from dictionary import carpetas, template_types, key_mapping
 import os 
 import re
@@ -49,10 +50,36 @@ for carpeta in carpetas:
             alerta_stage = check_stage_empty(df, campus_code)
             if alerta_stage:
                 alertas.append(alerta_stage)
-        
-            # Conectando a surveys
-            client = MongoClient(MONGO_URI)
+
+            #Recuperando el admission_id
             applicationIds = df['applicationId'].tolist()
+            client = MongoClient(MONGO_URI)
+            # admissions = fetch_admissions_data(client, "crm", "admissions", applicationIds)
+            # admissions = pd.DataFrame(admissions).rename(columns={'_id': 'admissionId'})
+            # df = pd.merge(df, admissions, on='applicationId', how='left')
+            # df.to_csv(output_dir_local + f"{campus_code}/crm.csv")
+            # df = df.sort_values(by=['stage', 'Nivel', 'Jornada', 'applicationId'], ascending=[True, True, True, True]).reset_index(drop=True)
+            # df = df.head(2)
+
+            # # #Descargando ficha individual
+            # for index, row in df.iterrows():
+            #         print(f"{index}/{len(df)}")
+            #         download_individual_report(
+            #             row["admissionId"], 
+            #             campus_code,
+            #             carpeta,
+            #             row["rut"], 
+            #             row["nombre_estudiante"], 
+            #             row["stage"], 
+            #             row["Nivel"], 
+            #             row["Jornada"], 
+            #             output_dir
+            #         )
+            # print(f"Descarga de fichas completada para campus_code {campus_code}.")
+            # os.makedirs(output_dir_local + f"{campus_code}/", exist_ok=True)
+            # df.to_csv(output_dir_local + f"{campus_code}/crm.csv")
+
+            # Conectando a surveys
             surveys = fetch_surveys_data(client, "tools", "surveys", applicationIds, template_types)
             surveys = pd.DataFrame(surveys).rename(columns={'_id': 'survey_id', 'externalId': 'applicationId'})
 
@@ -73,6 +100,7 @@ for carpeta in carpetas:
                         surveys_anterior = pd.read_csv(surveys_anterior_path, usecols=['applicationId', 'templateType', 'answers']).rename(columns={'answers': 'answers_anterior'})
                         surveys_completo = pd.merge(surveys, surveys_anterior, on=['applicationId', 'templateType'], how='left', indicator=True)
                         surveys_completo[['answers_str', 'answers_anterior_str']] = surveys_completo[['answers', 'answers_anterior']].astype(str)
+                        surveys_completo = surveys_completo.drop_duplicates(subset=["applicationId", "templateType", "answers_str"])
 
                         # Filtrar solo los que se van a actualizar porque no estaban antes o porque cambiaron
                         surveys = surveys_completo[(surveys_completo['_merge'] == 'left_only') | (surveys_completo['answers_str'] != surveys_completo['answers_anterior_str'])].reset_index(drop=True)
@@ -123,6 +151,7 @@ for carpeta in carpetas:
                     try:
                         contracts_anterior = pd.read_csv(contracts_anterior_path, usecols=['applicationId', 'providerTemplateId'])
                         contracts_completo = pd.merge(contracts, contracts_anterior, on=['applicationId', 'providerTemplateId'], how='left', indicator=True)
+                        contracts_completo = contracts_completo.drop_duplicates(subset=["applicationId", "providerTemplateId"])
 
                         # Filtrar solo los que se van a actualizar porque no estaban antes o porque cambiaron
                         contracts = contracts_completo[(contracts_completo['_merge'] == 'left_only')].reset_index(drop=True)
