@@ -5,7 +5,7 @@ def fetch_admissions_data(client, database, collection_name, application_ids, ba
     admissions_data = []
     for i in range(0, len(application_ids), batch_size):
         batch = application_ids[i:i + batch_size]
-        cursor = collection.find({"applicationId": {"$in": batch}}, {"_id": 1, "applicationId": 1})
+        cursor = collection.find({"applicationId": {"$in": batch}}, {"_id": 1, "applicationId": 1, "updatedAt": 1})
         admissions_data.extend(list(cursor))
     return admissions_data
 

@@ -1,7 +1,6 @@
 
 
 carpetas = [
-'25185 - Ozanam',
 '20364 - Ayelen',
 '25395 - Betterland',
 '14717 - Las Americas',
@@ -19,6 +18,7 @@ carpetas = [
 '8625 - Talleres San Vicente',
 '22234 - San Vicente de Paul',
 '2401 - Agrícola San Vicente',
+'25185 - Ozanam',
 '22192 - Federico Ozanam',
 '24213 - Santa Teresa',
 '24812 - San José de Renca',
@@ -102,8 +102,7 @@ carpetas = [
 '9597 - Pablo Rokha',
 '9595 - Capitan Avalos',
 '25960 - Padre A. Hurtado',
-'24403 - Simon Bolivar'
-]
+'24403 - Simon Bolivar']
 
 
 template_types = [

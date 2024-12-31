@@ -54,30 +54,44 @@ for carpeta in carpetas:
             #Recuperando el admission_id
             applicationIds = df['applicationId'].tolist()
             client = MongoClient(MONGO_URI)
-            # admissions = fetch_admissions_data(client, "crm", "admissions", applicationIds)
-            # admissions = pd.DataFrame(admissions).rename(columns={'_id': 'admissionId'})
-            # df = pd.merge(df, admissions, on='applicationId', how='left')
-            # df.to_csv(output_dir_local + f"{campus_code}/crm.csv")
-            # df = df.sort_values(by=['stage', 'Nivel', 'Jornada', 'applicationId'], ascending=[True, True, True, True]).reset_index(drop=True)
-            # df = df.head(2)
+            admissions = fetch_admissions_data(client, "crm", "admissions", applicationIds)
+            admissions = pd.DataFrame(admissions).rename(columns={'_id': 'admissionId'})
+            df = pd.merge(df, admissions, on='applicationId', how='left')
+            df = df.sort_values(by=['stage', 'Nivel', 'Jornada', 'applicationId'], ascending=[True, True, True, True]).reset_index(drop=True)
 
-            # # #Descargando ficha individual
-            # for index, row in df.iterrows():
-            #         print(f"{index}/{len(df)}")
-            #         download_individual_report(
-            #             row["admissionId"], 
-            #             campus_code,
-            #             carpeta,
-            #             row["rut"], 
-            #             row["nombre_estudiante"], 
-            #             row["stage"], 
-            #             row["Nivel"], 
-            #             row["Jornada"], 
-            #             output_dir
-            #         )
-            # print(f"Descarga de fichas completada para campus_code {campus_code}.")
-            # os.makedirs(output_dir_local + f"{campus_code}/", exist_ok=True)
-            # df.to_csv(output_dir_local + f"{campus_code}/crm.csv")
+            # # Ruta del archivo crm_anterior (version ya cargada de las fichas)
+            crm_anterior_path = output_dir_local + f"{campus_code}/crm.csv"
+            if os.path.exists(crm_anterior_path):
+                try:
+                    crm_anterior = pd.read_csv(crm_anterior_path, usecols=['applicationId'])
+                    crm_subir = pd.merge(df, crm_anterior, on=['applicationId'], how='left', indicator=True)
+                    # Filtrar solo los que se van a actualizar porque no estaban antes o porque cambiaron
+                    crm_subir = crm_subir[(crm_subir['_merge'] == 'left_only')].reset_index(drop=True)
+                    print(crm_subir.columns)
+
+                except Exception as e:
+                    print(f"Error al procesar crm_anterior: {e}")
+            else:
+                print(f"Archivo crm_anterior no encontrado: {crm_anterior_path}")
+
+
+            #Descargando ficha individual
+            for index, row in crm_subir.iterrows():
+                    print(f"{index}/{len(crm_subir)}")
+                    download_individual_report(
+                        row["admissionId"], 
+                        campus_code,
+                        carpeta,
+                        row["rut"], 
+                        row["nombre_estudiante"], 
+                        row["stage"], 
+                        row["Nivel"], 
+                        row["Jornada"], 
+                        output_dir
+                    )
+            print(f"Descarga de fichas completada para campus_code {campus_code}.")
+            os.makedirs(output_dir_local + f"{campus_code}/", exist_ok=True)
+            df.to_csv(output_dir_local + f"{campus_code}/crm.csv")
 
             # Conectando a surveys
             surveys = fetch_surveys_data(client, "tools", "surveys", applicationIds, template_types)
@@ -186,7 +200,6 @@ for carpeta in carpetas:
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 notas_file.write(f"\n\nProcesamiento completado para campus_code {campus_code} ({timestamp})\n")
                 notas_file.write("Alertas encontradas:\n")
-                notas_file.write("\n".join(alertas if alertas else ["Sin alertas."]))
                 notas_file.write("\n")
 
         except Exception as e:

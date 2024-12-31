@@ -16,7 +16,7 @@ def download_admission_form(campus_code):
             filter: { 
                 contentType: EXCEL 
                 contextTypes: "admission-completed"
-                processIDs: "6"
+                processIDs: ["6", "7", "8", "9", "100"]
             }
         ) {
             filename
